@@ -71,36 +71,39 @@ def main():
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    transforms_test = T.Compose([
-        T.ToTensor(),
-        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    # transforms_test = T.Compose([
+    #     T.ToTensor(),
+    #     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # ])
 
-    root_dir = "D:/dataset" ### Directory of dataset
+    # root_dir = "D:/dataset" ### Directory of dataset
+    root_dir = os.getcwd()
 
     train_set = CityScapesData(root_dir, "fine", "train", transforms_train, (768,768))
     valid_set = CityScapesData(root_dir, "fine", "val", transforms_val, (768,768))
-    test_set = CityScapesData(root_dir, "fine", "test", transforms_test, (768,768))
+    # test_set = CityScapesData(root_dir, "fine", "test", transforms_test, (768,768))
 
     train_batch_size = 16  # Control by YAML
     valid_batch_size = 64  # Control by YAML
-    test_batch_size = 32  # Control by YAML
+    # test_batch_size = 32  # Control by YAML
 
     train_loader = DataLoader(train_set, train_batch_size, num_workers=1)
     valid_loader = DataLoader(valid_set, valid_batch_size, num_workers=1)
-    test_loader = DataLoader(test_set, test_batch_size, num_workers=1)
+    # test_loader = DataLoader(test_set, test_batch_size, num_workers=1)
 
     # device = torch.device("cuda")
 
     model = SpyGR(device).to(device)
-
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)  # Control by YAML
+    
+    learning_rate = 9e-3
+    weight_decay = 1e-4
+    optimizer = optim.Adam(model.parameters(), weight_decay=weight_decay, lr=learning_rate)  # Control by YAML
     criterion = nn.CrossEntropyLoss(ignore_index=train_set.ignore_label).cuda()
 
     num_epochs = 80  # Control by YAML
     model.train()
 
-    num_params = sum([np.prod(p.shape) for p in model.parameters()])
+    num_params = sum([np.prod(p.shape) for p    in model.parameters()])
     print("Total number of parameters: {}".format(num_params))
 
     num_params_update = sum([np.prod(p.shape)
@@ -111,6 +114,7 @@ def main():
 
     global_step = 0
     steps_per_epoch = len(train_loader)
+    save_path = os.path.join(root_dir, 'SpyGR-segmentation', 'model')
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(train_loader):
             optimizer.zero_grad()
@@ -123,6 +127,10 @@ def main():
             loss = criterion(outputs, labels)
             loss.backward()
 
+            for param_group in optimizer.param_groups:
+                current_lr = learning_rate * ((1 - epoch / num_epochs) ** 0.9)
+                param_group['lr'] = current_lr
+                
             optimizer.step()
 
             print("[epoch][s/s_per_e/global_step]: [{}/{}][{}/{}/{}], loss: {:.12f}".format(
@@ -132,8 +140,8 @@ def main():
                           "model": model.state_dict(),
                           "optimizer": optimizer.state_dict()}
 
-            torch.save(checkpoint, os.path.join(
-                "D:/model", "spygr", "-{:07d}.pth".format(global_step)))
+            # torch.save(checkpoint, os.path.join("D:/model", "spygr", "-{:07d}.pth".format(global_step)))
+            torch.save(checkpoint, os.path.join(save_path, "-{:07d}.pth".format(global_step)))
 
             global_step += 1
 
