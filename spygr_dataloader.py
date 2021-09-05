@@ -62,14 +62,18 @@ class CityScapesData(Dataset):
 
     def __getitem__(self, index):
         img_path, mask_path = self.img_list[index]
+        
         img = Image.open(img_path).convert("RGB")
         mask = Image.open(mask_path)
-        img, mask = self.random_crop(img, mask)
-
         mask = np.array(mask)
         mask_copy = mask.copy()
+
         for k, v in self.id_to_trainid.items():
             mask_copy[mask==k] = v
+        mask = Image.fromarray(mask_copy.astype(np.uint8))
+        
+        img, mask = self.random_crop(img, mask)
+
         # label = Image.fromarray(label_copy.astype(np.uint8))
         # label = np.array(label, dtype=np.float32)
         # label = torch.from_numpy(np.array(label_copy, dtype=np.int32)).long()
@@ -77,6 +81,7 @@ class CityScapesData(Dataset):
         if self.transform is not None:
             img = self.transform(img)
         
-        mask = torch.from_numpy(np.array(mask_copy, dtype=np.int32)).long()
+        # mask = torch.from_numpy(np.array(mask_copy, dtype=np.int32)).long()
+        mask = torch.from_numpy(np.array(mask, dtype=np.int32)).long()
         
         return img, mask
